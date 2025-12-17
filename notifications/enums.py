@@ -1,0 +1,30 @@
+from enum import Enum, auto
+
+class Severity(Enum):
+    INFO = auto()
+    WARNING = auto()
+    CRITICAL = auto()
+
+class EventType(Enum):
+    # System Events
+    BOT_START = "BOT_START"
+    BOT_STOP = "BOT_STOP"
+    BOT_CRASH = "BOT_CRASH"
+    BOT_HEARTBEAT = "BOT_HEARTBEAT"
+    VPS_RESTART = "VPS_RESTART"
+    MT5_DISCONNECTED = "MT5_DISCONNECTED"
+    MT5_RECONNECTED = "MT5_RECONNECTED"
+
+    # Trade Events
+    TRADE_OPEN = "TRADE_OPEN"
+    TRADE_CLOSE = "TRADE_CLOSE"
+
+    # Risk Events
+    DAILY_LOSS_LIMIT_HIT = "DAILY_LOSS_LIMIT_HIT"
+    MAX_TRADES_REACHED = "MAX_TRADES_REACHED"
+    DRAWDOWN_WARNING = "DRAWDOWN_WARNING"
+    TRADING_PAUSED = "TRADING_PAUSED"
+    TRADING_RESUMED = "TRADING_RESUMED"
+
+    # Summary Events
+    DAILY_SUMMARY = "DAILY_SUMMARY"

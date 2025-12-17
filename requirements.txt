@@ -1,0 +1,12 @@
+pandas>=2.2.0
+numpy>=1.26.0
+matplotlib>=3.8.0
+ccxt>=4.3.70
+MetaTrader5>=5.0.37
+oandapyV20>=0.7.2
+# websocket-client>=1.7.0  # Deriv websocket client (disabled)
+requests>=2.31.0
+python-dateutil>=2.9.0.post0
+pytest>=7.4.0
+python-dotenv>=1.0.1
+tqdm>=4.66.5

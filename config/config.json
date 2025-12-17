@@ -1,0 +1,137 @@
+{
+  "broker": "mt5",
+  "risk_per_trade": 0.02,
+  "max_trades_per_day": 10,
+  "daily_loss_limit": 0.1,
+  "timeframe": "M5",
+  "poll_interval": 30,
+  "equity": 10000,
+  "htf_trend_timeframe": "M15",
+  "max_trades_per_symbol_per_day": 2,
+  "cooldown_candles_after_loss": 5,
+  "winrate_pause_threshold": 0.3,
+  "winrate_lookback_trades": 20,
+  "consecutive_sl_pause_count": 3,
+
+  "strategy_settings": {
+    "liquidity_sweep": {
+      "lookback_candles_min": 10,
+      "lookback_candles_max": 30
+    },
+    "breakeven": {
+      "r_level": 1.0,
+      "deriv_advanced_r_level": 0.8
+    },
+    "engine_a_lsmc": {
+      "enabled": true,
+      "impulse_atr_multiplier": 1.5,
+      "ema_fast_period": 9,
+      "ema_slow_period": 21,
+      "rsi_period": 14,
+      "fib_pullback_depth": 0.382,
+      "tp_rr_min": 1.5,
+      "tp_rr_max": 2.0
+    },
+    "engine_b_rsi_fibonacci": {
+      "enabled": true,
+      "impulse_atr_multiplier": 1.5,
+      "ema_fast_period": 9,
+      "ema_slow_period": 21,
+      "rsi_period": 14,
+      "fib_pullback_min": 0.5,
+      "fib_pullback_max": 0.618,
+      "tp_rr_min": 2.0,
+      "tp_rr_max": 3.0
+    }
+  },
+
+  "symbols": [
+    "frxEURUSD", "frxGBPUSD", "frxUSDJPY", "frxUSDCHF", "frxAUDUSD",
+    "R_100", "R_75", "R_50", "R_25", "R_10", "CRASH1000", "BOOM1000",
+    "CRASH500", "BOOM500", "JD100", "stpRNG", "frxXAUUSD", "cryBTCUSD"
+  ],
+
+  "deriv": {
+    "live_data": false,
+    "live_trading": false,
+    "multiplier": 10,
+    "use_api_symbols": false,
+    "symbols": [
+      "frxEURUSD",
+      "frxGBPUSD",
+      "frxUSDJPY",
+      "frxUSDCHF",
+      "frxAUDUSD",
+      "R_100",
+      "R_75",
+      "R_50",
+      "R_25",
+      "R_10",
+      "CRASH1000",
+      "BOOM1000",
+      "CRASH500",
+      "BOOM500",
+      "JD100",
+      "stpRNG",
+      "frxXAUUSD",
+      "cryBTCUSD"
+    ]
+  },
+
+  "mt5": {
+    "login_env": "MT5_LOGIN",
+    "password_env": "MT5_PASSWORD",
+    "server_env": "MT5_SERVER",
+    "path_env": "MT5_PATH",
+    "login": null,
+    "password": null,
+    "server": null,
+    "live_trading": true,
+    "symbols": [
+      "frxEURUSD", "frxGBPUSD", "frxUSDJPY", "frxUSDCHF", "frxAUDUSD",
+      "R_100", "R_75", "R_50", "R_25", "R_10", "CRASH1000", "BOOM1000",
+      "CRASH500", "BOOM500", "JD100", "stpRNG", "frxXAUUSD", "cryBTCUSD"
+    ]
+  },
+
+  "binance": {
+    "api_key_env": "BINANCE_API_KEY",
+    "api_secret_env": "BINANCE_API_SECRET",
+    "api_key": null,
+    "api_secret": null,
+    "testnet": true,
+    "live_data": false,
+    "live_trading": false,
+    "symbols": [
+      "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","ADAUSDT","XRPUSDT"
+    ]
+  },
+
+  "oanda": {
+    "account_id_env": "OANDA_ACCOUNT_ID",
+    "access_token_env": "OANDA_ACCESS_TOKEN",
+    "account_id": null,
+    "access_token": null,
+    "practice": true,
+    "live_data": false,
+    "live_trading": false,
+    "symbols": [
+      "EUR_USD","GBP_USD","USD_JPY","AUD_USD","USD_CHF","USD_CAD","XAU_USD"
+    ]
+  },
+
+  "telegram": {
+    "enabled": true,
+    "bot_token_env": "TELEGRAM_BOT_TOKEN",
+    "chat_id_env": "TELEGRAM_CHAT_ID"
+  },
+
+  "email": {
+    "enabled": false,
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "username_env": "EMAIL_USERNAME",
+    "password_env": "EMAIL_PASSWORD",
+    "to_env": "EMAIL_TO"
+  }
+}

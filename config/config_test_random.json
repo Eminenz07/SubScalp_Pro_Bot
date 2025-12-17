@@ -1,0 +1,87 @@
+{
+  "broker": "mt5",
+  "risk_per_trade": 0.01,
+  "max_trades_per_day": 20,
+  "daily_loss_limit": 0.10,
+  "timeframe": "M5",
+  "poll_interval": 10,
+  "equity": 10000,
+
+  // Test with the 18 symbols you specified
+  "symbols": [
+    "frxEURUSD",
+    "frxGBPUSD", 
+    "frxUSDJPY",
+    "frxUSDCHF",
+    "frxAUDUSD",
+    "R_100",
+    "R_75", 
+    "R_50",
+    "R_25",
+    "R_10",
+    "CRASH1000",
+    "BOOM1000",
+    "CRASH500",
+    "BOOM500",
+    "JD100",
+    "stpRNG",
+    "frxXAUUSD",
+    "cryBTCUSD"
+  ],
+
+  // Deriv broker settings
+  "deriv": {
+    "app_id_env": "DERIV_APP_ID",
+    "api_token_env": "DERIV_API_TOKEN",
+    "app_id": null,
+    "api_token": null,
+    "live_data": false,
+    "live_trading": false,
+    "multiplier": 10,
+    "use_api_symbols": false,
+    "symbols": []
+  },
+  "mt5": {
+    "login_env": "MT5_LOGIN",
+    "password_env": "MT5_PASSWORD",
+    "server_env": "MT5_SERVER",
+    "path_env": "MT5_PATH",
+    "live_trading": true,
+    "paper_mode": true,
+    "symbols": [
+      "EURUSD",
+      "GBPUSD",
+      "USDJPY",
+      "USDCHF",
+      "AUDUSD",
+      "Volatility 100 Index",
+      "Volatility 75 Index",
+      "Volatility 50 Index",
+      "Volatility 25 Index",
+      "Volatility 10 Index",
+      "Crash 1000 Index",
+      "Boom 1000 Index",
+      "Crash 500 Index",
+      "Boom 500 Index",
+      "Jump 100 Index",
+      "Step Index",
+      "XAUUSD",
+      "BTCUSD"
+    ]
+  },
+
+  "telegram": {
+    "enabled": true,
+    "bot_token_env": "TELEGRAM_BOT_TOKEN",
+    "chat_id_env": "TELEGRAM_CHAT_ID"
+  },
+
+  "email": {
+    "enabled": false,
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "username_env": "EMAIL_USERNAME",
+    "password_env": "EMAIL_PASSWORD",
+    "to_env": "EMAIL_TO"
+  }
+}

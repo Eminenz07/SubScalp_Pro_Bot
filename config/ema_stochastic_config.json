@@ -1,0 +1,24 @@
+{
+  "strategy_name": "EMA_Stochastic",
+  "timeframe_signal": "M5",
+  "timeframe_trend": "M30",
+  "ema_period": 10,
+  "trend_ema_period": 50,
+  "trend_ema_long_period": 200,
+  "stochastic": {
+    "k_period": 70,
+    "d_period": 1,
+    "slowing": 1,
+    "method": "exponential",
+    "level_overbought": 90,
+    "level_oversold": 10
+  },
+  "atr": {
+    "period": 14,
+    "sl_multiplier": 1.5,
+    "tp_multiplier": 3.0
+  },
+  "risk_reward": 2.0,
+  "breakeven_threshold": 20,
+  "breakeven_offset": 1
+}

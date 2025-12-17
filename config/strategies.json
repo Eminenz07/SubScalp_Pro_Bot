@@ -1,0 +1,22 @@
+{
+  "ema": {
+    "fast_period": 21,
+    "slow_period": 50
+  },
+  "atr": {
+    "period": 14,
+    "multiplier": 1.5
+  },
+  "rsi": {
+    "period": 14,
+    "overbought": 80,
+    "oversold": 20
+  },
+  "stochastic": {
+    "k_period": 14,
+    "d_period": 3,
+    "smooth": 3
+  },
+  "risk_reward": 2.0,
+  "multi_timeframes": ["M15", "H1"]
+}
