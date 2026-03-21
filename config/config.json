@@ -12,7 +12,6 @@
   "winrate_pause_threshold": 0.3,
   "winrate_lookback_trades": 20,
   "consecutive_sl_pause_count": 3,
-
   "strategy_settings": {
     "liquidity_sweep": {
       "lookback_candles_min": 10,
@@ -21,6 +20,16 @@
     "breakeven": {
       "r_level": 1.0,
       "deriv_advanced_r_level": 0.8
+    },
+    "impulsive_crossover": {
+      "enabled": true,
+      "loss_streak_limit": 3,
+      "lockout_slope_stability_count": 3,
+      "slope_threshold": 0.05,
+      "trail_activation_r": 1.75,
+      "trail_weak_multiplier": 1.2,
+      "trail_strong_multiplier": 1.6,
+      "strong_regime_slope_multiplier": 2.0
     },
     "engine_a_lsmc": {
       "enabled": true,
@@ -44,13 +53,26 @@
       "tp_rr_max": 3.0
     }
   },
-
   "symbols": [
-    "frxEURUSD", "frxGBPUSD", "frxUSDJPY", "frxUSDCHF", "frxAUDUSD",
-    "R_100", "R_75", "R_50", "R_25", "R_10", "CRASH1000", "BOOM1000",
-    "CRASH500", "BOOM500", "JD100", "stpRNG", "frxXAUUSD", "cryBTCUSD"
+    "frxEURUSD",
+    "frxGBPUSD",
+    "frxUSDJPY",
+    "frxUSDCHF",
+    "frxAUDUSD",
+    "R_100",
+    "R_75",
+    "R_50",
+    "R_25",
+    "R_10",
+    "CRASH1000",
+    "BOOM1000",
+    "CRASH500",
+    "BOOM500",
+    "JD100",
+    "stpRNG",
+    "frxXAUUSD",
+    "cryBTCUSD"
   ],
-
   "deriv": {
     "live_data": false,
     "live_trading": false,
@@ -77,7 +99,6 @@
       "cryBTCUSD"
     ]
   },
-
   "mt5": {
     "login_env": "MT5_LOGIN",
     "password_env": "MT5_PASSWORD",
@@ -88,12 +109,26 @@
     "server": null,
     "live_trading": true,
     "symbols": [
-      "frxEURUSD", "frxGBPUSD", "frxUSDJPY", "frxUSDCHF", "frxAUDUSD",
-      "R_100", "R_75", "R_50", "R_25", "R_10", "CRASH1000", "BOOM1000",
-      "CRASH500", "BOOM500", "JD100", "stpRNG", "frxXAUUSD", "cryBTCUSD"
+      "frxEURUSD",
+      "frxGBPUSD",
+      "frxUSDJPY",
+      "frxUSDCHF",
+      "frxAUDUSD",
+      "R_100",
+      "R_75",
+      "R_50",
+      "R_25",
+      "R_10",
+      "CRASH1000",
+      "BOOM1000",
+      "CRASH500",
+      "BOOM500",
+      "JD100",
+      "stpRNG",
+      "frxXAUUSD",
+      "cryBTCUSD"
     ]
   },
-
   "binance": {
     "api_key_env": "BINANCE_API_KEY",
     "api_secret_env": "BINANCE_API_SECRET",
@@ -103,10 +138,14 @@
     "live_data": false,
     "live_trading": false,
     "symbols": [
-      "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","ADAUSDT","XRPUSDT"
+      "BTCUSDT",
+      "ETHUSDT",
+      "BNBUSDT",
+      "SOLUSDT",
+      "ADAUSDT",
+      "XRPUSDT"
     ]
   },
-
   "oanda": {
     "account_id_env": "OANDA_ACCOUNT_ID",
     "access_token_env": "OANDA_ACCESS_TOKEN",
@@ -116,16 +155,20 @@
     "live_data": false,
     "live_trading": false,
     "symbols": [
-      "EUR_USD","GBP_USD","USD_JPY","AUD_USD","USD_CHF","USD_CAD","XAU_USD"
+      "EUR_USD",
+      "GBP_USD",
+      "USD_JPY",
+      "AUD_USD",
+      "USD_CHF",
+      "USD_CAD",
+      "XAU_USD"
     ]
   },
-
   "telegram": {
     "enabled": true,
     "bot_token_env": "TELEGRAM_BOT_TOKEN",
     "chat_id_env": "TELEGRAM_CHAT_ID"
   },
-
   "email": {
     "enabled": false,
     "smtp_server": "smtp.gmail.com",

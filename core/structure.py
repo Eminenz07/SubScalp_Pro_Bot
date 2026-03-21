@@ -259,7 +259,7 @@ def detect_trend_exhaustion(df: pd.DataFrame, bias: str, ema_period: int = 200, 
 
     # Exhausted if any two conditions are true
     conditions = [ema_distance, legs_exceeded, time_exceeded, declining]
-    conditions = [ema_distance, legs_exceeded, time_exceeded, declining]
-    reasons = ["ema_stretch", "impulse_count", "trend_duration", "momentum_decay"] if cond else []
+    reason_names = ["ema_stretch", "impulse_count", "trend_duration", "momentum_decay"]
     exhausted = sum(conditions) >= 2  # Require at least two factors for exhaustion
-    return {"exhausted": exhausted, "reasons": [name for cond, name in zip(conditions, ["ema_stretch", "impulse_count", "trend_duration", "momentum_decay"]) if cond]}
+    reasons = [name for cond, name in zip(conditions, reason_names) if cond]
+    return {"exhausted": exhausted, "reasons": reasons}

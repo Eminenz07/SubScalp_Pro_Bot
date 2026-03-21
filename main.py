@@ -16,6 +16,7 @@ from core.strategy_random import StrategyRandom
 from core.strategy_ema_stochastic import StrategyEMAStochastic
 from core.strategy_lsmc import StrategyLSMC
 from core.strategy_rsi_fibonacci import StrategyRSIFibonacci
+from core.strategy_impulsive_crossover import StrategyImpulsiveCrossover
 from core.risk_manager import RiskConfig, RiskManager
 from core.break_even_manager import BreakEvenManager
 from core.survival_rules import SurvivalRules
@@ -97,6 +98,9 @@ def build_trade_stack(strategy_name: str) -> Dict[str, Any]:
     elif strategy_name == "LSMC":
         config_path = cfg_path
         strategy = StrategyLSMC(cfg, analytics)
+    elif strategy_name == "IMPULSIVE_CROSSOVER":
+        config_path = cfg_path
+        strategy = StrategyImpulsiveCrossover(cfg)
     else:
         raise ValueError(f"Unknown strategy: {strategy_name}")
     
@@ -231,6 +235,26 @@ def aligned_row(symbol: str, base_tf: str, stack: Dict[str, Any]) -> Dict[str, A
             }
 
         return None
+
+    elif strategy_name == "StrategyImpulsiveCrossover":
+        # Dual Timeframe: H1 (Trend) + M15 (Entry) - or base_tf
+        signal_tf = base_tf # Should be M15
+        trend_tf = "H1"
+        
+        df_signal = data.fetch_ohlcv(symbol, signal_tf, limit=500)
+        if df_signal is None or df_signal.empty:
+            return None
+            
+        df_trend = data.fetch_ohlcv(symbol, trend_tf, limit=500)
+        if df_trend is None or df_trend.empty:
+            return None
+            
+        sig_df = strategy.generate_signals(df_signal, df_trend)
+        if sig_df is None or sig_df.empty:
+            return None
+            
+        return sig_df.iloc[-1].to_dict()
+
     else:
         # Determine timeframes for MTF alignment
         timeframes: List[str] = list(strategy.params.get("multi_timeframes", []))
@@ -293,41 +317,36 @@ def process_symbol(symbol: str, base_timeframe: str, stack: Dict[str, Any]) -> N
         error_logger.error(f"Error processing {symbol}: {e}")
 
 
-def main() -> None:
-    strategy_options = {
-        "1": "EMA_HYBRID",
-        "2": "RANDOM",
-        "3": "EMA_STOCHASTIC",
-        "4": "LSMC"
-    }
-    
-    while True:
-        print("Select strategy:")
-        for num, name in strategy_options.items():
-            print(f"  {num}. {name}")
-        
-        choice = input("Enter number (1-4): ").strip()
-        strategy_name = strategy_options.get(choice)
-        
-        if strategy_name:
-            break
-        else:
-            print("Invalid choice. Please enter a number between 1 and 3.")
+def run_bot(strategy: str, stop_event=None) -> None:
+    """Entry point for the web UI.
 
-    stack = build_trade_stack(strategy_name)
+    Args:
+        strategy: Strategy name (e.g. "IMPULSIVE_CROSSOVER").
+        stop_event: A threading.Event that, when set, cleanly stops the loop.
+    """
+    stack = build_trade_stack(strategy)
     cfg: Dict[str, Any] = stack["config"]
 
     symbols: List[str] = list(cfg.get("symbols", []))
     base_timeframe: str = str(cfg.get("timeframe", "M15"))
     poll_interval: float = float(cfg.get("poll_interval", 30))
 
-    start_msg = f"SubScalpBot starting with broker={cfg.get('broker')} symbols={symbols} base_tf={base_timeframe} interval={poll_interval}s"
+    start_msg = (
+        f"SubScalpBot starting with broker={cfg.get('broker')} "
+        f"symbols={symbols} base_tf={base_timeframe} interval={poll_interval}s"
+    )
     trade_logger.info(start_msg)
     notifier: Notifier = stack["notifier"]
-    notifier.notify(EventType.BOT_START, Severity.INFO, {"message": start_msg, "strategy": strategy_name})
+    notifier.notify(EventType.BOT_START, Severity.INFO, {"message": start_msg, "strategy": strategy})
 
     try:
         while True:
+            # Allow the web UI to request a clean stop
+            if stop_event and stop_event.is_set():
+                trade_logger.info("SubScalpBot stopped by web UI.")
+                notifier.notify(EventType.BOT_STOP, Severity.INFO, {"message": "SubScalpBot stopped by web UI."})
+                break
+
             for sym in symbols:
                 process_symbol(sym, base_timeframe, stack)
             stack["manager"].monitor_positions()
@@ -342,7 +361,32 @@ def main() -> None:
     finally:
         if "notifier" in stack:
             stack["notifier"].shutdown()
-        logging.shutdown()
+
+
+def main() -> None:
+    strategy_options = {
+        "1": "EMA_HYBRID",
+        "2": "RANDOM",
+        "3": "EMA_STOCHASTIC",
+        "4": "LSMC",
+        "5": "IMPULSIVE_CROSSOVER"
+    }
+    
+    while True:
+        print("Select strategy:")
+        for num, name in strategy_options.items():
+            print(f"  {num}. {name}")
+        
+        choice = input("Enter number (1-5): ").strip()
+        strategy_name = strategy_options.get(choice)
+        
+        if strategy_name:
+            break
+        else:
+            print("Invalid choice. Please enter a number between 1 and 5.")
+
+    # Reuse run_bot with no stop_event (CLI mode)
+    run_bot(strategy_name)
 
 
 if __name__ == "__main__":

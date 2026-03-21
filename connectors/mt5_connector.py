@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 import uuid
 import os
@@ -166,17 +166,26 @@ class MT5Connector(BaseConnector):
             point = float(getattr(symbol_info, 'point', 0.00001))
             stops_level = int(getattr(symbol_info, 'stops_level', 0))  # in points
             
-            # Calculate min distances
-            min_sl_distance = stops_level * point
-            min_tp_distance = stops_level * point  # Often same as stops_level for TP
+            # Calculate min distances (Safe guard against 0 stops_level)
+            # If stops_level is 0, use 2 points as a safety buffer
+            safe_distance = max(stops_level, 10) * point
             
             # Adjust SL and TP to meet minimum distance requirements
+            # IMPORTANT: For BUY, SL must be below Bid. For SELL, SL must be above Ask.
             if side == "buy":
-                adjusted_sl = min(float(sl), tick.ask - min_sl_distance)
-                adjusted_tp = max(float(tp), tick.ask + min_tp_distance)
+                # Buy: SL < Bid, TP > Ask
+                max_sl = tick.bid - safe_distance
+                min_tp = tick.ask + safe_distance
+                
+                adjusted_sl = min(float(sl), max_sl)
+                adjusted_tp = max(float(tp), min_tp)
             else:  # sell
-                adjusted_sl = max(float(sl), tick.bid + min_sl_distance)
-                adjusted_tp = min(float(tp), tick.bid - min_tp_distance)
+                # Sell: SL > Ask, TP < Bid
+                min_sl = tick.ask + safe_distance
+                max_tp = tick.bid - safe_distance
+                
+                adjusted_sl = max(float(sl), min_sl)
+                adjusted_tp = min(float(tp), max_tp)
             
             # Round to tick size if necessary (assuming trade_tick_size is point for simplicity)
             def round_to_point(value: float, point: float) -> float:
@@ -200,12 +209,15 @@ class MT5Connector(BaseConnector):
             # Calculate required margin for the order
             calc_margin = mt5.order_calc_margin(order_type, symbol, volume, price)  # type: ignore[attr-defined]
             if calc_margin is None or calc_margin <= 0:
-                raise RuntimeError(f"Failed to calculate margin for {symbol}")
-            
-            required_margin = float(calc_margin)
+                # Fallback if calc fails (sometimes returns None on demo)
+                required_margin = 0.0
+            else:
+                required_margin = float(calc_margin)
             
             # If required margin exceeds free margin, reduce volume
-            while required_margin > free_margin and volume > volume_min:
+            loop_safe = 0
+            while required_margin > free_margin and volume > volume_min and loop_safe < 50:
+                loop_safe += 1
                 volume -= volume_step
                 volume = max(volume_min, round(volume / volume_step) * volume_step)
                 calc_margin = mt5.order_calc_margin(order_type, symbol, volume, price)  # type: ignore[attr-defined]
@@ -213,8 +225,12 @@ class MT5Connector(BaseConnector):
                     break
                 required_margin = float(calc_margin)
             
-            if required_margin > free_margin or volume < volume_min:
-                raise ValueError(f"Insufficient margin for volume {volume} (required: {required_margin}, free: {free_margin})")
+            if (required_margin > free_margin and required_margin > 0) or volume < volume_min:
+                 # Try one last ditch: minimum volume
+                 if free_margin > 0:
+                     volume = volume_min
+                 else:
+                     raise ValueError(f"Insufficient margin for volume {volume}")
 
             request = {
                 "action": mt5.TRADE_ACTION_DEAL,  # type: ignore[attr-defined]
@@ -240,7 +256,7 @@ class MT5Connector(BaseConnector):
                 return oid
             raise RuntimeError(f"order_send failed: retcode={getattr(result, 'retcode', 'unknown')} comment={getattr(result, 'comment', '')}")
         except Exception as e:
-            error_logger.error(f"MT5 place_order error: {e}. Falling back to paper mode for this order.")
+            error_logger.error(f"MT5 place_order error for {symbol}: {e}. Falling back to paper mode for this order.")
             order_id = str(uuid.uuid4())
             self._paper_positions[order_id] = _PaperPosition(
                 order_id=order_id, symbol=symbol, side=side, size=float(size), sl=float(sl), tp=float(tp)
@@ -412,6 +428,96 @@ class MT5Connector(BaseConnector):
             return {"equity": float(getattr(acct, "equity", 0.0))}
         except Exception:
             return {"equity": float(self.config.get("equity", 0.0))}
+
+    def get_open_positions(self) -> List[Dict[str, Any]]:
+        """Fetch all open positions relevant to this bot."""
+        if not self.connected:
+            self.connect()
+            
+        if self.paper_mode or not MT5_AVAILABLE:
+            return [{
+                "contract_id": pid,
+                "symbol": p.symbol,
+                "side": p.side,
+                "size": p.size,
+                "entry_price": p.entry_price or 0.0,
+                "sl": p.sl,
+                "tp": p.tp,
+                "status": "open"
+            } for pid, p in self._paper_positions.items()]
+            
+        try:
+            positions = mt5.positions_get()  # type: ignore[attr-defined]
+            if positions is None:
+                return []
+                
+            out = []
+            for pos in positions:
+                # Filter by comment to only manage our own trades
+                if hasattr(pos, 'comment') and 'SubScalpBot' in str(getattr(pos, 'comment', '')):
+                    out.append({
+                        "contract_id": str(getattr(pos, 'ticket')),
+                        "symbol": getattr(pos, 'symbol'),
+                        "side": "buy" if getattr(pos, 'type') == mt5.ORDER_TYPE_BUY else "sell",  # type: ignore[attr-defined]
+                        "size": float(getattr(pos, 'volume')),
+                        "entry_price": float(getattr(pos, 'price_open')),
+                        "sl": float(getattr(pos, 'sl')),
+                        "tp": float(getattr(pos, 'tp')),
+                        "profit": float(getattr(pos, 'profit')),
+                        "status": "open"
+                    })
+            return out
+        except Exception as e:
+            error_logger.error(f"MT5 get_open_positions error: {e}")
+            return []
+
+    def modify_order(self, order_id: str, sl: float = None, tp: float = None) -> bool:
+        """Modify SL/TP of an existing order/position."""
+        if not self.connected:
+            self.connect()
+            
+        if self.paper_mode or not MT5_AVAILABLE:
+            if order_id in self._paper_positions:
+                if sl is not None:
+                    self._paper_positions[order_id].sl = sl
+                if tp is not None:
+                    self._paper_positions[order_id].tp = tp
+                return True
+            return False
+            
+        try:
+            position_id = int(order_id)
+            # 1. Get current position to check symbol
+            positions = mt5.positions_get(ticket=position_id)  # type: ignore[attr-defined]
+            if not positions:
+                return False
+                
+            pos = positions[0]
+            symbol = getattr(pos, 'symbol')
+            
+            request = {
+                "action": mt5.TRADE_ACTION_SLTP,  # type: ignore[attr-defined]
+                "symbol": symbol,
+                "position": position_id,
+            }
+            
+            if sl is not None:
+                request["sl"] = float(sl)
+            else:
+                request["sl"] = float(getattr(pos, 'sl'))
+                
+            if tp is not None:
+                request["tp"] = float(tp)
+            else:
+                request["tp"] = float(getattr(pos, 'tp'))
+                
+            result = mt5.order_send(request)  # type: ignore[attr-defined]
+            if result and getattr(result, "retcode") == mt5.TRADE_RETCODE_DONE:  # type: ignore[attr-defined]
+                return True
+            return False
+        except Exception as e:
+            error_logger.error(f"MT5 modify_order error: {e}")
+            return False
 
     # ---- Internals ----
     def _ensure_symbol_selected(self, symbol: str) -> None:

@@ -15,9 +15,6 @@ class MessageTemplates:
         timestamp = MessageTemplates.get_timestamp()
         
         message_lines = [f"{icon} {title}"]
-        timestamp = MessageTemplates.get_timestamp()
-        
-        message_lines = [f"{icon} {title}"]
         message_lines.append(f"{timestamp}")
         message_lines.append("")
 
@@ -37,7 +34,7 @@ class MessageTemplates:
             ])
         elif event == EventType.TRADE_CLOSE:
             profit = payload.get('profit', 0.0)
-            profit_icon = "KX" if profit >= 0 else "🔻"
+            profit_icon = "📈" if profit >= 0 else "🔻"
             message_lines.extend([
                 f"Symbol: {payload.get('symbol', 'N/A')}",
                 f"Action: {payload.get('order_type', 'N/A')}",

@@ -7,6 +7,7 @@ from .liquidity_sweep import detect_liquidity_sweep
 from .multi_timeframe_analysis import get_trend_bias, is_choppy
 from .structure import regime_analysis, detect_bos_choch, is_structurally_broken, count_impulse_legs, label_structure, detect_equal_levels, mark_inducement_zones, detect_bos_choch_pivots, detect_trend_exhaustion, get_last_impulse_leg
 from .exhaustion_event import ExhaustionEventManager
+from .regime_classifier import RegimeClassifier
 
 
 class StrategyLSMC:
@@ -26,7 +27,8 @@ class StrategyLSMC:
         self.fib_pullback_depth = self.strategy_settings["fib_pullback_depth"]
         self.tp_rr_min = self.strategy_settings["tp_rr_min"]
         self.tp_rr_max = self.strategy_settings["tp_rr_max"]
-        self.event_manager = ExhaustionEventManager(max_age_minutes=60)  # Persistent exhaustion event manager
+        self.event_manager = ExhaustionEventManager(max_age_minutes=60)
+        self.regime_classifier = RegimeClassifier()
 
     def _compute_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
@@ -90,53 +92,8 @@ class StrategyLSMC:
         return df_m5
 
     def mark_engine_b_consumed(self, symbol: str, trade_id: str = None):
+        """Mark that Engine B has been triggered for a symbol's exhaustion event."""
         self.event_manager.mark_engine_b_triggered(symbol, trade_id)
-        df_m5 = self._compute_indicators(df_m5)
-
-        trend_bias = get_trend_bias(df_m15, 50)
-        if trend_bias == "neutral" or is_choppy(df_m15, 50):
-            df_m5["signal"] = 0
-            df_m5["sl_distance"] = 0.0
-            df_m5["tp_distance"] = 0.0
-            return df_m5
-
-        bullish_sweep = detect_liquidity_sweep(
-            df_m5,
-            self.liquidity_sweep_settings["lookback_candles_min"],
-            self.liquidity_sweep_settings["lookback_candles_max"],
-            True,
-        )
-        bearish_sweep = detect_liquidity_sweep(
-            df_m5,
-            self.liquidity_sweep_settings["lookback_candles_min"],
-            self.liquidity_sweep_settings["lookback_candles_max"],
-            False,
-        )
-
-        df_m5["signal"] = 0
-        df_m5["sl_distance"] = 0.0
-        df_m5["tp_distance"] = 0.0
-
-        last = df_m5.iloc[-1]
-        atr_col = f"atr_{self.rsi_period}"
-        atr_val = float(last.get(atr_col, 0.0) or 0.0)
-        if atr_val <= 0:
-            return df_m5
-
-        impulse = is_impulse_candle(last, atr_val, self.impulse_atr_multiplier)
-        sl_dist = atr_val
-        tp_dist = self.tp_rr_min * sl_dist
-
-        if trend_bias == "bullish" and bullish_sweep and impulse:
-            df_m5.at[df_m5.index[-1], "signal"] = 1
-            df_m5.at[df_m5.index[-1], "sl_distance"] = sl_dist
-            df_m5.at[df_m5.index[-1], "tp_distance"] = tp_dist
-        elif trend_bias == "bearish" and bearish_sweep and impulse:
-            df_m5.at[df_m5.index[-1], "signal"] = -1
-            df_m5.at[df_m5.index[-1], "sl_distance"] = sl_dist
-            df_m5.at[df_m5.index[-1], "tp_distance"] = tp_dist
-
-        return df_m5
 
     def evaluate_market(self, df_m5: pd.DataFrame, df_m15: pd.DataFrame, symbol: str) -> tuple[str, dict]:
         df_m5 = self._compute_indicators(df_m5)
@@ -286,8 +243,4 @@ class StrategyLSMC:
             else:
                 return ("BLOCK_ALL_TRADES", {**ctx, "reason": "no_exhaustion"})
 
-    def mark_engine_b_consumed(self, symbol: str):
-        if symbol in self.exhaustion_states:
-            self.exhaustion_states[symbol]["consumed"] = True
-
-        return ("BLOCK_ALL_TRADES", {**ctx, "reason": "invalid"})
+        return ("BLOCK_ALL_TRADES", {"reason": "invalid"})

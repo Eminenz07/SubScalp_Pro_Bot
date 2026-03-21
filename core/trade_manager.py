@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Dict, Optional, Any, List
+from datetime import datetime
 import math
 import random
 
@@ -9,6 +10,7 @@ from notifications.enums import EventType, Severity
 from .risk_manager import RiskManager
 from .break_even_manager import BreakEvenManager
 from .engine_analytics import EngineAnalytics
+from database.queries import TradeQueries, LogQueries
 
 
 class TradeManager:
@@ -240,9 +242,21 @@ class TradeManager:
                     self.open_positions[symbol].append({
                         "contract_id": order1, "side": side, "entry_price": float(price), "size": float(partial_size),
                         "sl": float(sl), "tp": float(partial_tp), "breakeven_triggered": False,
-                        "engine": engine, "partial_closed": False, "is_partial": True # Added flags
+                        "engine": engine, "partial_closed": False, "is_partial": True
                     })
                     order_ids.append(order1)
+                    # ── DB: record partial trade open ──
+                    try:
+                        TradeQueries.insert_trade({
+                            "ticket": str(order1), "symbol": symbol,
+                            "direction": side.upper(), "lots": partial_size,
+                            "entry_price": price, "sl": sl, "tp": partial_tp,
+                            "strategy": engine, "engine": engine,
+                            "open_time": datetime.now().isoformat(timespec="seconds"),
+                        })
+                        LogQueries.insert_log("TRADE", f"[TRADE] {side.upper()} {symbol} {partial_size} lots @ {price} | SL: {sl} | TP: {partial_tp} | Engine: {engine} (partial)")
+                    except Exception as db_err:
+                        error_logger.error(f"DB insert_trade error (partial): {db_err}")
             except Exception as e:
                 error_logger.error(f"Partial place_order failed: {e}")
 
@@ -253,9 +267,21 @@ class TradeManager:
                     self.open_positions[symbol].append({
                         "contract_id": order2, "side": side, "entry_price": float(price), "size": float(full_size),
                         "sl": float(sl), "tp": float(full_tp), "breakeven_triggered": False,
-                        "engine": engine, "partial_closed": False, "is_partial": False # Added flags
+                        "engine": engine, "partial_closed": False, "is_partial": False
                     })
                     order_ids.append(order2)
+                    # ── DB: record full trade open ──
+                    try:
+                        TradeQueries.insert_trade({
+                            "ticket": str(order2), "symbol": symbol,
+                            "direction": side.upper(), "lots": full_size,
+                            "entry_price": price, "sl": sl, "tp": full_tp,
+                            "strategy": engine, "engine": engine,
+                            "open_time": datetime.now().isoformat(timespec="seconds"),
+                        })
+                        LogQueries.insert_log("TRADE", f"[TRADE] {side.upper()} {symbol} {full_size} lots @ {price} | SL: {sl} | TP: {full_tp} | Engine: {engine}")
+                    except Exception as db_err:
+                        error_logger.error(f"DB insert_trade error (full): {db_err}")
             except Exception as e:
                 error_logger.error(f"Full place_order failed: {e}")
 
@@ -299,6 +325,18 @@ class TradeManager:
                         "message": f"Opened {side} {symbol} (Engine {engine})"
                     }
                     self._notify_event(EventType.TRADE_OPEN, Severity.INFO, payload)
+                    # ── DB: record trade open ──
+                    try:
+                        TradeQueries.insert_trade({
+                            "ticket": str(order_id), "symbol": symbol,
+                            "direction": side.upper(), "lots": size,
+                            "entry_price": price, "sl": sl, "tp": tp,
+                            "strategy": engine, "engine": engine,
+                            "open_time": datetime.now().isoformat(timespec="seconds"),
+                        })
+                        LogQueries.insert_log("TRADE", f"[TRADE] {side.upper()} {symbol} {size} lots @ {price} | SL: {sl} | TP: {tp} | Engine: {engine}")
+                    except Exception as db_err:
+                        error_logger.error(f"DB insert_trade error: {db_err}")
             except Exception as e:
                 error_logger.error(f"place_order failed: {e}")
 
@@ -358,10 +396,18 @@ class TradeManager:
                     "price": price,
                     "profit": pnl,
                     "strategy": pos.get("engine"),
-                    "duration": "N/A",  # could compute if entry_time was stored
+                    "duration": "N/A",
                     "message": f"Closed sub-position {pos['side']} {symbol} ({reason})"
                 }
                 self._notify_event(EventType.TRADE_CLOSE, Severity.INFO, payload)
+                
+                # ── DB: record trade close ──
+                try:
+                    TradeQueries.close_trade(ticket=str(pos["contract_id"]), exit_price=float(price), pnl=pnl)
+                    outcome = "WIN" if pnl > 0 else "LOSS"
+                    LogQueries.insert_log("TRADE", f"[CLOSE] {symbol} ticket={pos['contract_id']} @ {price} | PnL: {pnl:+.2f} | {outcome}")
+                except Exception as db_err:
+                    error_logger.error(f"DB close_trade error: {db_err}")
                 
                 # Register trade result with RiskManager and Analytics
                 try:
@@ -477,6 +523,13 @@ class TradeManager:
                                 "message": f"Closed sub-position {pos['side']} {symbol} externally ({reason})"
                             })
                             
+                            # ── DB: record externally closed trade ──
+                            try:
+                                TradeQueries.close_trade(ticket=str(contract_id), exit_price=0.0, pnl=pnl)
+                                LogQueries.insert_log("TRADE", f"[CLOSE] {symbol} ticket={contract_id} closed externally | PnL: {pnl:+.2f}")
+                            except Exception as db_err:
+                                error_logger.error(f"DB close_trade error (external): {db_err}")
+                            
                             # Register a zero-pnl trade result to update risk limits/analytics
                             try:
                                 self.risk.register_trade_result(symbol, pnl, engine=pos.get("engine")) 
@@ -590,6 +643,14 @@ class TradeManager:
                             "strategy": pos.get("engine"),
                             "message": f"Closed {pos['side']} {symbol} at {exit_spot:.5f} ({reason})"
                         })
+                        
+                        # ── DB: record Deriv closed trade ──
+                        try:
+                            TradeQueries.close_trade(ticket=str(contract_id), exit_price=float(exit_spot), pnl=pnl)
+                            outcome = "WIN" if pnl > 0 else "LOSS"
+                            LogQueries.insert_log("TRADE", f"[CLOSE] {symbol} ticket={contract_id} @ {exit_spot} | PnL: {pnl:+.2f} | {outcome}")
+                        except Exception as db_err:
+                            error_logger.error(f"DB close_trade error (Deriv): {db_err}")
                         
                         # Register trade result with RiskManager and Analytics
                         try:

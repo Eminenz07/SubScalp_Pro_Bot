@@ -22,6 +22,15 @@ def ema(df: pd.DataFrame, period: int, column: str = "close", name: str | None =
     return df
 
 
+def sma(df: pd.DataFrame, period: int, column: str = "close", name: str | None = None) -> pd.DataFrame:
+    """Append Simple Moving Average to DataFrame."""
+    if df is None or df.empty:
+        return df
+    name = name or f"sma_{period}"
+    df[name] = df[column].rolling(window=period).mean()
+    return df
+
+
 def atr(df: pd.DataFrame, period: int, name: str | None = None) -> pd.DataFrame:
     """Append Average True Range to DataFrame.
 
@@ -55,6 +64,49 @@ def rsi(df: pd.DataFrame, period: int, column: str = "close", name: str | None =
     avg_loss = pd.Series(loss, index=df.index).ewm(alpha=1 / period, adjust=False).mean()
     rs = avg_gain / (avg_loss + 1e-12)
     df[name] = 100 - (100 / (1 + rs))
+    return df
+
+
+def adx(df: pd.DataFrame, period: int = 14, name: str | None = None) -> pd.DataFrame:
+    """Append Average Directional Index (ADX) to DataFrame.
+    
+    Calculates signal strength. ADX < 25 often indicates choppy/ranging markets.
+    """
+    if df is None or df.empty:
+        return df
+    
+    name = name or f"adx_{period}"
+    
+    # Needs High, Low, Close
+    high = df["high"]
+    low = df["low"]
+    close = df["close"]
+    
+    # 1. Calculate TR and +/- DM
+    prev_close = close.shift(1)
+    tr = pd.concat([(high - low), (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(axis=1)
+    
+    up_move = high.diff()
+    down_move = -low.diff()
+    
+    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+    
+    plus_dm = pd.Series(plus_dm, index=df.index)
+    minus_dm = pd.Series(minus_dm, index=df.index)
+    
+    # 2. Smooth TR and +/- DM (Wilder's Smoothing)
+    # alpha = 1/period
+    tr_smooth = tr.ewm(alpha=1/period, adjust=False).mean()
+    plus_di = 100 * (plus_dm.ewm(alpha=1/period, adjust=False).mean() / tr_smooth)
+    minus_di = 100 * (minus_dm.ewm(alpha=1/period, adjust=False).mean() / tr_smooth)
+    
+    # 3. DX
+    dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di + 1e-12)
+    
+    # 4. ADX (EMA of DX)
+    df[name] = dx.ewm(alpha=1/period, adjust=False).mean()
+    
     return df
 
 
@@ -145,3 +197,33 @@ def rsi_divergence(df: pd.DataFrame, rsi_period: int) -> str:
     except Exception:
         pass
     return "none"
+
+
+def is_atr_expanding(df: pd.DataFrame, period: int = 14, lookback: int = 20, name: str | None = None) -> bool:
+    """Check if current ATR is expanding (current > mean of last N periods).
+    
+    This indicates increasing volatility/momentum strength.
+    
+    Args:
+        df: OHLCV DataFrame with high, low, close.
+        period: ATR calculation period (default 14).
+        lookback: Number of periods to calculate mean ATR (default 20).
+        name: Optional ATR column name. If None, will compute ATR.
+    
+    Returns:
+        True if current ATR > mean of last `lookback` ATR values.
+    """
+    if df is None or df.empty or len(df) < period + lookback:
+        return False
+    
+    # Compute ATR if not already present
+    atr_col = name or f"atr_{period}"
+    if atr_col not in df.columns:
+        atr(df, period, name=atr_col)
+    
+    # Get current ATR and mean of last N periods
+    atr_values = df[atr_col].iloc[-(lookback + 1):]  # Last N+1 values
+    current_atr = float(atr_values.iloc[-1])
+    atr_mean = float(atr_values.iloc[:-1].mean())  # Mean of previous N
+    
+    return current_atr > atr_mean

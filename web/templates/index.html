@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SubScalp WealthBot</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+
+<!-- ════════════════════ SIDEBAR ════════════════════ -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">SubScalp</div>
+    <div class="logo-sub">WealthBot v2.0 · <span id="broker-label">MT5</span></div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-label">Navigation</div>
+    <button class="nav-item active" onclick="goto('dashboard', this)">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-item" onclick="goto('analytics', this)">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l4-4 3 3 5-7"/></svg>
+      Analytics
+    </button>
+    <button class="nav-item" onclick="goto('trades', this)">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h5"/></svg>
+      Trade History
+    </button>
+    <button class="nav-item" onclick="goto('settings', this)">
+      <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
+      Settings
+    </button>
+  </nav>
+
+  <div class="bot-status-pill">
+    <div class="status-row">
+      <span class="status-label">Bot Status</span>
+      <div class="status-dot stopped" id="status-dot"></div>
+    </div>
+    <div class="status-strategy" id="status-strategy">—</div>
+    <button class="bot-toggle" id="toggle-btn" onclick="toggleBot()">START BOT</button>
+  </div>
+</aside>
+
+<!-- ════════════════════ MAIN ════════════════════ -->
+<main class="main">
+
+  <div class="topbar">
+    <div class="page-title" id="page-title">Dashboard</div>
+    <div class="topbar-right">
+      <span class="strategy-badge" id="strategy-label">—</span>
+      <span class="broker-badge" id="mode-badge">MT5 · DEMO</span>
+      <div class="topbar-clock" id="topbar-clock"></div>
+    </div>
+  </div>
+
+  <!-- ══ DASHBOARD ══ -->
+  <div class="page active" id="page-dashboard">
+
+    <div class="stats-grid">
+      <div class="stat-card accent">
+        <div class="stat-label">Account Balance</div>
+        <div class="stat-value" id="stat-balance">—</div>
+        <div class="stat-delta" id="stat-balance-delta">loading...</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Open P&amp;L</div>
+        <div class="stat-value" id="stat-open-pnl">—</div>
+        <div class="stat-delta" id="stat-open-count">— open positions</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-label">Trades Today</div>
+        <div class="stat-value" id="stat-trades-today">—</div>
+        <div class="stat-delta" id="stat-trades-wr">loading...</div>
+      </div>
+      <div class="stat-card warn">
+        <div class="stat-label">Daily Drawdown</div>
+        <div class="stat-value" id="stat-drawdown">—</div>
+        <div class="stat-delta">Limit: <span id="stat-dd-limit">—</span></div>
+      </div>
+    </div>
+
+    <div class="three-col">
+      <!-- Active Positions -->
+      <div class="card">
+        <div class="section-header">
+          <span class="section-title">Active Positions</span>
+          <span class="section-sub" id="open-count-label">loading...</span>
+        </div>
+        <div id="open-trades-wrap">
+          <table class="trade-table" id="open-trades-table">
+            <thead><tr>
+              <th>Symbol</th><th>Dir</th><th>Lots</th><th>Entry</th><th>SL</th><th>TP</th><th>Strategy</th>
+            </tr></thead>
+            <tbody id="open-trades-body">
+              <tr><td colspan="7" class="empty-row">No open positions</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Survival Rules -->
+      <div class="card">
+        <div class="section-header">
+          <span class="section-title">Survival Rules</span>
+          <span class="section-sub" id="rules-status">checking...</span>
+        </div>
+        <div class="rules-list" id="rules-list">
+          <div class="rule-row"><span class="rule-label">Daily loss limit</span><span class="rule-val" id="rule-daily-loss">—</span></div>
+          <div class="rule-row"><span class="rule-label">Volatility lock</span><span class="rule-val" id="rule-volatility">—</span></div>
+          <div class="rule-row"><span class="rule-label">Consec. SL pause</span><span class="rule-val" id="rule-consec-sl">—</span></div>
+          <div class="rule-row"><span class="rule-label">Winrate check</span><span class="rule-val" id="rule-winrate">—</span></div>
+          <div class="rule-row"><span class="rule-label">Max trades/day</span><span class="rule-val" id="rule-max-trades">—</span></div>
+          <div class="rule-row"><span class="rule-label">Regime lock</span><span class="rule-val" id="rule-regime">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Log -->
+    <div class="card">
+      <div class="section-header">
+        <span class="section-title">Live Log</span>
+        <span class="section-sub" id="log-timestamp">—</span>
+      </div>
+      <div class="log-feed" id="log-feed">
+        <div class="log-line"><span class="log-time">—</span><span class="log-event">Connecting to server...</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ANALYTICS ══ -->
+  <div class="page" id="page-analytics">
+    <div class="analytics-stats">
+      <div class="stat-card blue">
+        <div class="stat-label">Total Trades</div>
+        <div class="stat-value" id="an-total">—</div>
+        <div class="stat-delta">Last 30 days</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value green" id="an-winrate">—</div>
+        <div class="stat-delta" id="an-wl">—W · —L</div>
+      </div>
+      <div class="stat-card accent">
+        <div class="stat-label">Profit Factor</div>
+        <div class="stat-value" id="an-pf" style="color:var(--accent)">—</div>
+        <div class="stat-delta">Target: &gt;1.5</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Net P&amp;L</div>
+        <div class="stat-value" id="an-pnl">—</div>
+        <div class="stat-delta" id="an-return">—% return</div>
+      </div>
+      <div class="stat-card warn">
+        <div class="stat-label">Avg Win</div>
+        <div class="stat-value green" id="an-avg-win">—</div>
+        <div class="stat-delta" id="an-avg-loss">Avg loss: —</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="section-header">
+          <span class="section-title">Equity Curve</span>
+          <span class="section-sub">30-day forward test</span>
+        </div>
+        <canvas id="equityChart" height="160"></canvas>
+      </div>
+      <div class="card">
+        <div class="section-header">
+          <span class="section-title">Win / Loss Breakdown</span>
+          <span class="section-sub" id="donut-label">— trades</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:24px">
+          <div class="donut-wrap">
+            <svg id="donut-svg" width="120" height="120" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="16"/>
+              <circle id="donut-win" cx="60" cy="60" r="48" fill="none" stroke="#22c55e" stroke-width="16"
+                stroke-dasharray="0 301.6" stroke-dashoffset="75.4" stroke-linecap="round"/>
+              <circle id="donut-loss" cx="60" cy="60" r="48" fill="none" stroke="#ef4444" stroke-width="16"
+                stroke-dasharray="0 301.6" stroke-dashoffset="75.4" stroke-linecap="round"/>
+            </svg>
+            <div class="donut-center">
+              <div class="donut-pct" id="donut-pct">—</div>
+              <div class="donut-lbl">winrate</div>
+            </div>
+          </div>
+          <div style="flex:1">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;font-size:13px">
+                <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:var(--green);display:inline-block"></span>Wins</span>
+                <span style="font-family:var(--font-mono);color:var(--green)" id="donut-wins">—</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:13px">
+                <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:var(--red);display:inline-block"></span>Losses</span>
+                <span style="font-family:var(--font-mono);color:var(--red)" id="donut-losses">—</span>
+              </div>
+              <div style="border-top:1px solid var(--border);padding-top:10px;font-size:12px;color:var(--muted)">
+                Avg Win: <span style="color:var(--green);font-family:var(--font-mono)" id="donut-avg-win">—</span><br>
+                Avg Loss: <span style="color:var(--red);font-family:var(--font-mono)" id="donut-avg-loss">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="section-header">
+        <span class="section-title">Strategy Performance</span>
+        <span class="section-sub">All strategies</span>
+      </div>
+      <table class="trade-table">
+        <thead><tr>
+          <th>Strategy</th><th>Trades</th><th>Win Rate</th><th>Net P&amp;L</th><th>Avg Win</th><th>Avg Loss</th>
+        </tr></thead>
+        <tbody id="strategy-stats-body">
+          <tr><td colspan="6" class="empty-row">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <span class="section-title">Daily P&amp;L</span>
+        <span class="section-sub">Last 14 days</span>
+      </div>
+      <canvas id="pnlChart" height="100"></canvas>
+    </div>
+  </div>
+
+  <!-- ══ TRADE HISTORY ══ -->
+  <div class="page" id="page-trades">
+    <div class="filter-bar">
+      <select class="form-select" id="filter-strategy" onchange="loadTrades()" style="width:200px">
+        <option value="">All Strategies</option>
+        <option>IMPULSIVE_CROSSOVER</option>
+        <option>LSMC</option>
+        <option>EMA_HYBRID</option>
+        <option>EMA_STOCHASTIC</option>
+      </select>
+      <select class="form-select" id="filter-symbol" onchange="loadTrades()" style="width:140px">
+        <option value="">All Symbols</option>
+        <option>XAUUSD</option><option>EURUSD</option><option>BTCUSD</option>
+        <option>GBPUSD</option><option>USDJPY</option><option>GBPJPY</option>
+      </select>
+      <select class="form-select" id="filter-days" onchange="loadTrades()" style="width:140px">
+        <option value="1">Today</option>
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="9999">All time</option>
+      </select>
+    </div>
+    <div class="card">
+      <table class="trade-table">
+        <thead><tr>
+          <th>Time</th><th>Symbol</th><th>Dir</th><th>Lots</th>
+          <th>Entry</th><th>Exit</th><th>SL</th><th>TP</th>
+          <th>P&amp;L</th><th>Strategy</th><th>Status</th>
+        </tr></thead>
+        <tbody id="history-body">
+          <tr><td colspan="11" class="empty-row">Loading trade history...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ SETTINGS ══ -->
+  <div class="page" id="page-settings">
+    <div class="section-header" style="margin-bottom:16px">
+      <span class="section-title">Strategy Selection</span>
+      <span class="section-sub">Pick one to run</span>
+    </div>
+    <div class="strategy-cards">
+      <div class="strategy-card" data-strategy="IMPULSIVE_CROSSOVER" onclick="selectStrategy(this)">
+        <div class="strategy-card-name">Impulsive Crossover</div>
+        <div class="strategy-card-desc">H1 trend + M15 entry. RSI 50-cross signals with regime lockout.</div>
+        <div class="strategy-card-badge dev">V2 · Active dev</div>
+      </div>
+      <div class="strategy-card" data-strategy="LSMC" onclick="selectStrategy(this)">
+        <div class="strategy-card-name">LSMC Dual Engine</div>
+        <div class="strategy-card-desc">Liquidity sweep + momentum continuation with RSI/Fib Engine B.</div>
+        <div class="strategy-card-badge stable">Dual Engine</div>
+      </div>
+      <div class="strategy-card" data-strategy="EMA_HYBRID" onclick="selectStrategy(this)">
+        <div class="strategy-card-name">EMA Hybrid</div>
+        <div class="strategy-card-desc">EMA crossover + ATR + RSI + Stochastic multi-timeframe alignment.</div>
+        <div class="strategy-card-badge stable">Stable</div>
+      </div>
+      <div class="strategy-card" data-strategy="EMA_STOCHASTIC" onclick="selectStrategy(this)">
+        <div class="strategy-card-name">EMA Stochastic</div>
+        <div class="strategy-card-desc">Multi-TF EMA + Stochastic overbought/oversold entries.</div>
+        <div class="strategy-card-badge stable">Stable</div>
+      </div>
+      <div class="strategy-card" data-strategy="RANDOM" onclick="selectStrategy(this)">
+        <div class="strategy-card-name">Random</div>
+        <div class="strategy-card-desc">Random signal generator for infrastructure testing only.</div>
+        <div class="strategy-card-badge test">Test only</div>
+      </div>
+    </div>
+
+    <div class="settings-grid">
+      <div class="card">
+        <div class="section-header"><span class="section-title">Risk Parameters</span></div>
+        <div class="form-group">
+          <label class="form-label">Risk per trade (%)</label>
+          <input class="form-input" type="number" id="cfg-risk_per_trade" step="0.1" placeholder="2">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Max trades per day</label>
+          <input class="form-input" type="number" id="cfg-max_trades_per_day" placeholder="10">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Daily loss limit (%)</label>
+          <input class="form-input" type="number" id="cfg-daily_loss_limit" step="0.5" placeholder="10">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Max trades per symbol/day</label>
+          <input class="form-input" type="number" id="cfg-max_trades_per_symbol_per_day" placeholder="2">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cooldown candles after loss</label>
+          <input class="form-input" type="number" id="cfg-cooldown_candles_after_loss" placeholder="5">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Consecutive SL pause count</label>
+          <input class="form-input" type="number" id="cfg-consecutive_sl_pause_count" placeholder="3">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-header"><span class="section-title">Bot Configuration</span></div>
+        <div class="form-group">
+          <label class="form-label">Broker</label>
+          <select class="form-select" id="cfg-broker">
+            <option value="mt5">MT5</option>
+            <option value="deriv">Deriv</option>
+            <option value="binance">Binance</option>
+            <option value="oanda">OANDA</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Primary timeframe</label>
+          <select class="form-select" id="cfg-timeframe">
+            <option>M5</option><option>M15</option><option>M1</option><option>H1</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">HTF trend timeframe</label>
+          <select class="form-select" id="cfg-htf_trend_timeframe">
+            <option>M15</option><option>H1</option><option>H4</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Poll interval (seconds)</label>
+          <input class="form-input" type="number" id="cfg-poll_interval" placeholder="30">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Winrate pause threshold (%)</label>
+          <input class="form-input" type="number" id="cfg-winrate_pause_threshold" placeholder="30">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Winrate lookback (trades)</label>
+          <input class="form-input" type="number" id="cfg-winrate_lookback_trades" placeholder="20">
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:8px;display:flex;gap:12px;align-items:center">
+      <button class="save-btn" id="save-btn" onclick="saveSettings()">SAVE CONFIGURATION</button>
+      <span class="save-feedback" id="save-feedback"></span>
+    </div>
+  </div>
+
+</main>
+
+<!-- SocketIO client -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
