@@ -8,6 +8,7 @@ class TradeQueries:
     @staticmethod
     def insert_trade(trade: dict) -> int:
         """Insert a new trade. Called by trade_manager.py after order placement."""
+        trade['lots'] = round(float(trade.get('lots', 0.0)), 2)
         conn = get_db()
         with conn:
             cur = conn.execute("""
@@ -132,7 +133,7 @@ class TradeQueries:
         conn = get_db()
         row = conn.execute("""
             SELECT COUNT(*) AS cnt FROM trades
-            WHERE DATE(open_time) = DATE('now')
+            WHERE DATE(open_time) = DATE('now') AND status != 'failed'
         """).fetchone()
         conn.close()
         return row["cnt"] if row else 0

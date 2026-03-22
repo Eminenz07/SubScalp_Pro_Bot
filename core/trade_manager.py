@@ -636,10 +636,15 @@ class TradeManager:
                         positions_to_keep.append(pos)
                         continue
                     
-                    if status == "sold":
+                    if status == "sold" or details.get("is_expired"):
                         # Position was closed by the broker
-                        exit_spot = details.get("sell_spot", details.get("current_spot", pos.get("entry_price", 0)))
-                        pnl = details.get("profit", 0)
+                        exit_spot = details.get("sell_spot", details.get("sell_price", details.get("current_spot", pos.get("entry_price", 0))))
+                        entry_spot = details.get("buy_price", pos.get("entry_price", 0))
+                        
+                        try:
+                            pnl = float(details.get("profit", float(exit_spot) - float(entry_spot)))
+                        except:
+                            pnl = 0.0
                         
                         # Estimate reason for closure 
                         tp_dist = abs(exit_spot - pos["tp"])
