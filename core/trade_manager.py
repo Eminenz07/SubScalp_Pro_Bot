@@ -249,9 +249,9 @@ class TradeManager:
                     try:
                         TradeQueries.insert_trade({
                             "ticket": str(order1), "symbol": symbol,
-                            "direction": side.upper(), "lots": partial_size,
+                            "direction": side.upper(), "lots": round(partial_size, 2),
                             "entry_price": price, "sl": sl, "tp": partial_tp,
-                            "strategy": engine, "engine": engine,
+                            "strategy": row.get("strategy", "UNKNOWN"), "engine": engine,
                             "open_time": datetime.now().isoformat(timespec="seconds"),
                         })
                         LogQueries.insert_log("TRADE", f"[TRADE] {side.upper()} {symbol} {partial_size} lots @ {price} | SL: {sl} | TP: {partial_tp} | Engine: {engine} (partial)")
@@ -274,9 +274,9 @@ class TradeManager:
                     try:
                         TradeQueries.insert_trade({
                             "ticket": str(order2), "symbol": symbol,
-                            "direction": side.upper(), "lots": full_size,
+                            "direction": side.upper(), "lots": round(full_size, 2),
                             "entry_price": price, "sl": sl, "tp": full_tp,
-                            "strategy": engine, "engine": engine,
+                            "strategy": row.get("strategy", "UNKNOWN"), "engine": engine,
                             "open_time": datetime.now().isoformat(timespec="seconds"),
                         })
                         LogQueries.insert_log("TRADE", f"[TRADE] {side.upper()} {symbol} {full_size} lots @ {price} | SL: {sl} | TP: {full_tp} | Engine: {engine}")
@@ -329,9 +329,9 @@ class TradeManager:
                     try:
                         TradeQueries.insert_trade({
                             "ticket": str(order_id), "symbol": symbol,
-                            "direction": side.upper(), "lots": size,
+                            "direction": side.upper(), "lots": round(size, 2),
                             "entry_price": price, "sl": sl, "tp": tp,
-                            "strategy": engine, "engine": engine,
+                            "strategy": row.get("strategy", "UNKNOWN"), "engine": engine,
                             "open_time": datetime.now().isoformat(timespec="seconds"),
                         })
                         LogQueries.insert_log("TRADE", f"[TRADE] {side.upper()} {symbol} {size} lots @ {price} | SL: {sl} | TP: {tp} | Engine: {engine}")
@@ -368,6 +368,8 @@ class TradeManager:
             return False
             
         success_count = 0
+        
+        positions_to_keep = []
         
         # Close all constituent orders
         for pos in positions_to_close:
@@ -422,9 +424,16 @@ class TradeManager:
                     )
                 except Exception as e:
                     error_logger.error(f"Analytics/Risk update error: {e}")
+            else:
+                # Keep tracking if the close failed
+                positions_to_keep.append(pos)
         
-        # Remove all positions for this symbol from local tracking
-        self.open_positions.pop(symbol, None)
+        # Update symbol tracking
+        if positions_to_keep:
+            self.open_positions[symbol] = positions_to_keep
+        else:
+            self.open_positions.pop(symbol, None)
+            
         return success_count > 0
 
     def process_signal(self, symbol: str, row: Dict[str, Any]) -> bool:

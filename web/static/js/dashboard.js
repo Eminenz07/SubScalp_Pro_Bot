@@ -111,7 +111,7 @@ function applyOpenTrades(trades) {
     <tr>
       <td>${t.symbol}</td>
       <td><span class="badge ${t.direction.toLowerCase()}">${t.direction}</span></td>
-      <td>${t.lots}</td>
+      <td>${Number(t.lots).toFixed(2)}</td>
       <td>${fmt.price(t.entry_price)}</td>
       <td>${fmt.price(t.sl)}</td>
       <td>${fmt.price(t.tp)}</td>

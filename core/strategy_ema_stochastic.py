@@ -96,4 +96,5 @@ class StrategyEMAStochastic:
         df.loc[signaled, "sl_distance"] = self.sl_mult * atr_col[signaled]
         df.loc[signaled, "tp_distance"] = self.tp_mult * atr_col[signaled]
 
+        df["strategy"] = "EMA_STOCHASTIC"
         return df

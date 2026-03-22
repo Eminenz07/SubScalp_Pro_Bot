@@ -309,6 +309,7 @@ class StrategyImpulsiveCrossover:
                 df_m15.at[df_m15.index[-1], "sl_distance"] = sl_dist
                 df_m15.at[df_m15.index[-1], "tp_distance"] = sl_dist * self.risk_reward_ratio
 
+        df_m15["strategy"] = "IMPULSIVE_CROSSOVER"
         return df_m15
 
     def record_trade_result(self, trade_result: str):

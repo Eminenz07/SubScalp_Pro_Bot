@@ -89,6 +89,7 @@ class StrategyLSMC:
             df_m5.at[df_m5.index[-1], "sl_distance"] = sl_dist
             df_m5.at[df_m5.index[-1], "tp_distance"] = tp_dist
 
+        df_m5["strategy"] = "LSMC"
         return df_m5
 
     def mark_engine_b_consumed(self, symbol: str, trade_id: str = None):

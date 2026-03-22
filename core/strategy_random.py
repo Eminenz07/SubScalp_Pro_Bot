@@ -59,6 +59,7 @@ class StrategyRandom:
         # Set stop loss and take profit distances based on ATR
         df["sl_distance"] = self.atr_mult * atr_col
         df["tp_distance"] = self.rr * df["sl_distance"]
+        df["strategy"] = "RANDOM"
         
         return df
 

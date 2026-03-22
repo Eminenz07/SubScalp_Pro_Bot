@@ -52,4 +52,5 @@ class StrategyEMAHybrid:
 
         df["sl_distance"] = self.atr_mult * atr_col
         df["tp_distance"] = self.rr * df["sl_distance"]
+        df["strategy"] = "EMA_HYBRID"
         return df
