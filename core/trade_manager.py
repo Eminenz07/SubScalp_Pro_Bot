@@ -606,8 +606,13 @@ class TradeManager:
                 positions_to_keep: List[Dict[str, Any]] = []
                 
                 for pos in positions:
-                    contract_id = pos.get("contract_id")
+                    contract_id = str(pos.get("contract_id", ""))
                     if not contract_id:
+                        continue
+                        
+                    # Skip paper positions (which are UUIDs)
+                    if not contract_id.isdigit():
+                        positions_to_keep.append(pos)
                         continue
                         
                     # Get details of the contract/order

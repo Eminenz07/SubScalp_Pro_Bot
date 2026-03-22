@@ -22,21 +22,23 @@ class BaseConnector(ABC):
 
 def get_connector(broker: str, config: Dict[str, Any], kwargs: Dict[str, Any]) -> BaseConnector:
     broker = broker.lower()
-    # Default to MT5 for SubScalpBot
-    if broker == "mt5":
-        from .mt5_connector import MT5Connector
-        return MT5Connector(config, **kwargs)
-    # Other connectors remain for future use but are not actively used
-    if broker == "binance":
-        from .binance_connector import BinanceConnector
-        return BinanceConnector(config, **kwargs)
-    if broker == "oanda":
-        from .oanda_connector import OandaConnector
-        return OandaConnector(config, **kwargs)
-    # Deriv connector deprecated but kept for reference
+
     if broker == "deriv":
         from .deriv_connector import DerivConnector
         return DerivConnector(config, **kwargs)
-    # Default fallback to MT5
-    from .mt5_connector import MT5Connector
-    return MT5Connector(config, **kwargs)
+
+    if broker == "mt5":
+        from .mt5_connector import MT5Connector
+        return MT5Connector(config, **kwargs)
+
+    if broker == "binance":
+        from .binance_connector import BinanceConnector
+        return BinanceConnector(config, **kwargs)
+
+    if broker == "oanda":
+        from .oanda_connector import OandaConnector
+        return OandaConnector(config, **kwargs)
+
+    # Default fallback — Deriv works on any OS, MT5 is Windows only
+    from .deriv_connector import DerivConnector
+    return DerivConnector(config, **kwargs)

@@ -61,6 +61,10 @@ class EngineAnalytics:
         elif engine == "B":
             self.engine_b_trades.append(trade_data)
         
+        # Ensure the engine exists in the dictionary to prevent KeyError
+        if engine not in self.daily_engine_stats:
+            self.daily_engine_stats[engine] = {"trades": 0, "wins": 0, "losses": 0, "pnl": 0.0}
+
         # Update daily stats
         self.daily_engine_stats[engine]["trades"] += 1
         self.daily_engine_stats[engine]["pnl"] += pnl

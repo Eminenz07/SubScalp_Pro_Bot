@@ -1,5 +1,5 @@
 {
-  "broker": "mt5",
+  "broker": "deriv",
   "risk_per_trade": 0.02,
   "max_trades_per_day": 10,
   "daily_loss_limit": 0.1,
@@ -74,9 +74,10 @@
     "cryBTCUSD"
   ],
   "deriv": {
-    "live_data": false,
-    "live_trading": false,
+    "live_data": true,
+    "live_trading": true,
     "multiplier": 10,
+    "rf_duration_minutes": 5,
     "use_api_symbols": false,
     "symbols": [
       "frxEURUSD",
