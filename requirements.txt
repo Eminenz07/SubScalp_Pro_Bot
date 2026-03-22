@@ -1,7 +1,7 @@
 # ── Existing SubScalp dependencies ──────────────────────────
 pandas>=2.2.0
 numpy>=1.26.0
-MetaTrader5>=5.0.37
+# MetaTrader5>=5.0.37
 ccxt>=4.3.70
 oandapyV20>=0.7.2
 requests>=2.31.0
