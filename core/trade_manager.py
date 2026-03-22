@@ -307,38 +307,42 @@ class TradeManager:
 
             try:
                 order_id = self.connector.place_order(symbol=symbol, side=side, size=size, sl=sl, tp=tp)
-                if order_id:
-                    self.open_positions[symbol].append({
-                        "contract_id": order_id, "side": side, "entry_price": float(price), "size": float(size),
-                        "sl": float(sl), "tp": float(tp), "breakeven_triggered": False,
-                        "engine": engine, "partial_closed": False, "is_partial": False
+                if not order_id:
+                    raise ValueError(f"place_order returned empty order_id for {symbol}")
+
+                self.open_positions[symbol].append({
+                    "contract_id": order_id, "side": side, "entry_price": float(price), "size": float(size),
+                    "sl": float(sl), "tp": float(tp), "breakeven_triggered": False,
+                    "engine": engine, "partial_closed": False, "is_partial": False,
+                    "open_time": datetime.now(tz=__import__('datetime').timezone.utc).isoformat(),
+                })
+                order_ids.append(order_id)
+                payload = {
+                    "symbol": symbol,
+                    "order_type": side,
+                    "volume": size,
+                    "price": price,
+                    "sl": sl,
+                    "tp": tp,
+                    "strategy": engine,
+                    "message": f"Opened {side} {symbol} (Engine {engine})"
+                }
+                self._notify_event(EventType.TRADE_OPEN, Severity.INFO, payload)
+                # ── DB: record trade open only after confirmed placement ──
+                try:
+                    TradeQueries.insert_trade({
+                        "ticket": str(order_id), "symbol": symbol,
+                        "direction": side.upper(), "lots": round(size, 2),
+                        "entry_price": price, "sl": sl, "tp": tp,
+                        "strategy": row.get("strategy", "UNKNOWN"), "engine": engine,
+                        "open_time": datetime.now().isoformat(timespec="seconds"),
                     })
-                    order_ids.append(order_id)
-                    payload = {
-                        "symbol": symbol,
-                        "order_type": side,
-                        "volume": size,
-                        "price": price,
-                        "sl": sl,
-                        "tp": tp,
-                        "strategy": engine,
-                        "message": f"Opened {side} {symbol} (Engine {engine})"
-                    }
-                    self._notify_event(EventType.TRADE_OPEN, Severity.INFO, payload)
-                    # ── DB: record trade open ──
-                    try:
-                        TradeQueries.insert_trade({
-                            "ticket": str(order_id), "symbol": symbol,
-                            "direction": side.upper(), "lots": round(size, 2),
-                            "entry_price": price, "sl": sl, "tp": tp,
-                            "strategy": row.get("strategy", "UNKNOWN"), "engine": engine,
-                            "open_time": datetime.now().isoformat(timespec="seconds"),
-                        })
-                        LogQueries.insert_log("TRADE", f"[TRADE] {side.upper()} {symbol} {size} lots @ {price} | SL: {sl} | TP: {tp} | Engine: {engine}")
-                    except Exception as db_err:
-                        error_logger.error(f"DB insert_trade error: {db_err}")
+                    LogQueries.insert_log("TRADE", f"[TRADE] {side.upper()} {symbol} {size} lots @ {price} | SL: {sl} | TP: {tp} | Engine: {engine}")
+                except Exception as db_err:
+                    error_logger.error(f"DB insert_trade error: {db_err}")
             except Exception as e:
-                error_logger.error(f"place_order failed: {e}")
+                error_logger.error(f"place_order failed for {symbol}: {e}")
+                LogQueries.insert_log("ERROR", f"[FAILED] {side.upper()} {symbol} — {e}")
 
         # --- Post-Order Registration ---
         if order_ids:
@@ -520,22 +524,36 @@ class TradeManager:
                         
                         if contract_id not in current_positions:
                             # Position was closed externally (SL/TP hit or manual close)
-                            reason = "tp_sl_hit" 
-                            pnl = 0.0 # Cannot get accurate PnL from here
+                            reason = "tp_sl_hit"
+                            # Try to get real exit price from connector
+                            exit_price = 0.0
+                            pnl = 0.0
+                            try:
+                                current_price = float(self.connector.get_current_price(pos["symbol"] if "symbol" in pos else symbol))
+                                exit_price = current_price if math.isfinite(current_price) else 0.0
+                                if exit_price > 0:
+                                    if pos["side"] == "buy":
+                                        pnl = (exit_price - pos["entry_price"]) * pos["size"]
+                                    else:
+                                        pnl = (pos["entry_price"] - exit_price) * pos["size"]
+                                    pnl = round(pnl, 2)
+                            except Exception:
+                                pass
 
                             self._notify_event(EventType.TRADE_CLOSE, Severity.INFO, {
                                 "symbol": symbol,
                                 "order_type": pos["side"],
-                                "price": "External",
+                                "price": exit_price or "External",
                                 "profit": pnl,
                                 "strategy": pos.get("engine"),
                                 "message": f"Closed sub-position {pos['side']} {symbol} externally ({reason})"
                             })
-                            
+
                             # ── DB: record externally closed trade ──
                             try:
-                                TradeQueries.close_trade(ticket=str(contract_id), exit_price=0.0, pnl=pnl)
-                                LogQueries.insert_log("TRADE", f"[CLOSE] {symbol} ticket={contract_id} closed externally | PnL: {pnl:+.2f}")
+                                TradeQueries.close_trade(ticket=str(contract_id), exit_price=exit_price, pnl=pnl)
+                                outcome = "WIN" if pnl > 0 else "LOSS"
+                                LogQueries.insert_log("TRADE", f"[CLOSE] {symbol} ticket={contract_id} closed externally @ {exit_price} | PnL: {pnl:+.2f} | {outcome}")
                             except Exception as db_err:
                                 error_logger.error(f"DB close_trade error (external): {db_err}")
                             
@@ -619,8 +637,34 @@ class TradeManager:
                     if not contract_id:
                         continue
                         
-                    # Skip paper positions (which are UUIDs)
+                    # Handle paper positions (UUID-based) — expire by time
                     if not contract_id.isdigit():
+                        from datetime import timezone as _tz
+                        rf_duration_minutes = int(
+                            (self.config.get("deriv") or {}).get("rf_duration_minutes", 5)
+                        )
+                        open_time_str = pos.get("open_time")
+                        if open_time_str:
+                            try:
+                                open_dt = datetime.fromisoformat(open_time_str)
+                                if open_dt.tzinfo is None:
+                                    open_dt = open_dt.replace(tzinfo=_tz.utc)
+                                now_utc = datetime.now(_tz.utc)
+                                elapsed_minutes = (now_utc - open_dt).total_seconds() / 60
+                                if elapsed_minutes >= rf_duration_minutes:
+                                    # Simulate random PnL for paper expired contract
+                                    import random as _rnd
+                                    pnl = round(_rnd.uniform(-pos["size"], pos["size"]), 2)
+                                    try:
+                                        TradeQueries.close_trade(ticket=contract_id, exit_price=pos.get("entry_price", 0.0), pnl=pnl)
+                                        outcome = "WIN" if pnl > 0 else "LOSS"
+                                        LogQueries.insert_log("TRADE", f"[CLOSE] {symbol} ticket={contract_id} expired (paper) | PnL: {pnl:+.2f} | {outcome}")
+                                    except Exception as db_err:
+                                        error_logger.error(f"DB close paper trade error: {db_err}")
+                                    # Don't keep this position
+                                    continue
+                            except Exception:
+                                pass
                         positions_to_keep.append(pos)
                         continue
                         
