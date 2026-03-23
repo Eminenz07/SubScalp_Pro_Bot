@@ -69,6 +69,19 @@ class TradeQueries:
         return [dict(r) for r in rows]
 
     @staticmethod
+    def get_today_pnl() -> float:
+        """Returns the net PnL for today's closed trades."""
+        conn = get_db()
+        row = conn.execute("""
+            SELECT SUM(pnl) as today_pnl
+            FROM trades
+            WHERE status = 'closed'
+              AND DATE(close_time) = DATE('now', 'localtime')
+        """).fetchone()
+        conn.close()
+        return round(row["today_pnl"] or 0.0, 2) if row else 0.0
+
+    @staticmethod
     def get_daily_stats(days: int = 30) -> dict:
         """Returns aggregate stats for the dashboard stat cards."""
         conn = get_db()

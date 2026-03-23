@@ -37,7 +37,11 @@ class RiskManager:
         today = dt.date.today()
         if self._current_day != today:
             self._current_day = today
-            self.daily_trade_count = 0
+            from database.queries import TradeQueries
+            try:
+                self.daily_trade_count = TradeQueries.get_today_trade_count()
+            except Exception:
+                self.daily_trade_count = 0
             self.current_daily_loss = 0.0
             self.engine_daily_counts.clear()
             self.symbol_engine_counts.clear()

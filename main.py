@@ -338,6 +338,9 @@ def run_bot(strategy: str, stop_event=None) -> None:
     trade_logger.info(start_msg)
     notifier: Notifier = stack["notifier"]
     notifier.notify(EventType.BOT_START, Severity.INFO, {"message": start_msg, "strategy": strategy})
+    
+    from database.queries import ConfigQueries
+    ConfigQueries.set_bot_running(True, strategy=strategy)
 
     try:
         while True:
@@ -359,6 +362,8 @@ def run_bot(strategy: str, stop_event=None) -> None:
         error_logger.error(f"Fatal error: {e}")
         stack["notifier"].notify(EventType.BOT_CRASH, Severity.CRITICAL, {"message": f"Fatal error: {e}"})
     finally:
+        from database.queries import ConfigQueries
+        ConfigQueries.set_bot_running(False)
         if "notifier" in stack:
             stack["notifier"].shutdown()
 

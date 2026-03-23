@@ -1,0 +1,3 @@
+{"timestamp": "2026-03-23T15:54:38.509191", "engine": null, "symbol": "R_25", "side": "buy", "entry_price": 3063.6500669018365, "exit_price": 3064.5, "pnl": 0.31, "reason": "unknown", "exhaustion_event_id": null, "is_win": true}
+{"timestamp": "2026-03-23T15:55:23.812216", "engine": null, "symbol": "R_10", "side": "sell", "entry_price": 5157.056946066907, "exit_price": 5155.498, "pnl": 0.31, "reason": "unknown", "exhaustion_event_id": null, "is_win": true}
+{"timestamp": "2026-03-23T15:55:54.910759", "engine": null, "symbol": "R_50", "side": "buy", "entry_price": 107.78623494665719, "exit_price": 107.7289, "pnl": -5.49, "reason": "unknown", "exhaustion_event_id": null, "is_win": false}

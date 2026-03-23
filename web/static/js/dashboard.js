@@ -73,15 +73,16 @@ socket.on('stats_update', (data) => {
 function applyStats(s) {
   if (!s) return;
 
-  const balance  = 10000 + (s.net_pnl || 0);
   const netPnl   = s.net_pnl || 0;
+  if(typeof window.currentTodayPnl === 'undefined') window.currentTodayPnl = 0;
+  window.currentTodayPnl = s.today_pnl || 0;
   const today    = s.total_trades || 0;
   const wins     = s.wins || 0;
   const losses   = s.losses || 0;
   const winrate  = s.winrate || 0;
   const openPos  = s.open_positions || 0;
 
-  setText('stat-balance',       fmt.currency(balance));
+  if(!window.hasLoadedBalance) setText('stat-balance', 'Loading...');
   setText('stat-balance-delta', `${netPnl >= 0 ? '+' : ''}${fmt.currency(netPnl)} total`);
   setClass('stat-balance-delta', netPnl >= 0 ? 'stat-delta up' : 'stat-delta dn');
 
@@ -91,9 +92,35 @@ function applyStats(s) {
   setText('stat-trades-today', `${today}`);
   setText('stat-trades-wr',    `${wins}W · ${losses}L · ${winrate}% WR`);
 
-  // Drawdown placeholder — real value comes from risk_manager
-  setText('stat-drawdown', '—');
+  // Drawdown placeholder — updated in fetchAccountBalance
+  if(!window.hasLoadedBalance) setText('stat-drawdown', 'Loading...');
 }
+
+async function fetchAccountBalance() {
+  try {
+    const res = await fetch("/api/dashboard/account");
+    const data = await res.json();
+    if (data && (data.balance !== undefined || data.equity !== undefined)) {
+      const bal = data.balance || data.equity;
+      window.hasLoadedBalance = true;
+      setText('stat-balance', fmt.currency(bal));
+
+      const startingBal = bal - (window.currentTodayPnl || 0);
+      if (startingBal > 0) {
+        const dd = ((window.currentTodayPnl || 0) / startingBal) * 100;
+        setText('stat-drawdown', String(dd > 0 ? '+' : '') + dd.toFixed(2) + '%');
+        setClass('stat-drawdown', dd >= 0 ? 'stat-delta up' : 'stat-delta dn');
+      } else {
+        setText('stat-drawdown', '0.00%');
+      }
+    }
+  } catch (err) {
+    console.error("Failed to fetch Deriv balance:", err);
+  }
+}
+
+fetchAccountBalance();
+setInterval(fetchAccountBalance, 30000);
 
 function applyOpenTrades(trades) {
   const tbody = document.getElementById('open-trades-body');
